@@ -1923,5 +1923,7 @@
     "TableOfContents": "Sommaire",
     "ConfirmSplitMedia": "Êtes-vous sûr de vouloir diviser les sources multimédias en éléments distincts ?",
     "Creators": "Créateurs",
-    "HeaderSplitMedia": "Séparer les supports"
+    "HeaderSplitMedia": "Séparer les supports",
+    "IndexNumber": "Numéro d'index",
+    "NoCastTargets": "Aucune cible de casting disponible"
 }
