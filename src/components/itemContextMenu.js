@@ -65,6 +65,14 @@ export async function getCommands(options) {
                 icon: 'play_arrow'
             });
         }
+
+        if (item.MediaType === 'Video') {
+            commands.push({
+                name: globalize.translate('PlayAudioOnly'),
+                id: 'playaudioonly',
+                icon: 'headphones'
+            });
+        }
     }
 
     if (playbackManager.getCurrentPlayer() !== null) {
@@ -552,6 +560,10 @@ function executeCommand(item, id, options) {
                 play(item, true);
                 getResolveFunction(resolve, id)();
                 break;
+            case 'playaudioonly':
+                play(item, false, false, false, true);
+                getResolveFunction(resolve, id)();
+                break;
             case 'queue':
                 play(item, false, true);
                 getResolveFunction(resolve, id)();
@@ -679,7 +691,7 @@ function deleteSeriesTimer(apiClient, item, resolve, command) {
     });
 }
 
-function play(item, resume, queue, queueNext) {
+function play(item, resume, queue, queueNext, audioOnly) {
     let method = 'play';
     if (queue) {
         if (queueNext) {
@@ -698,7 +710,8 @@ function play(item, resume, queue, queueNext) {
         playbackManager[method]({
             ids: [item.ChannelId],
             startPositionTicks: startPosition,
-            serverId: item.ServerId
+            serverId: item.ServerId,
+            playAudioOnly: audioOnly
         });
     } else {
         const sortParentId = 'items-' + (item.IsFolder ? item.Id : item.ParentId) + '-Folder';
@@ -710,7 +723,8 @@ function play(item, resume, queue, queueNext) {
             queryOptions: {
                 SortBy: sortValues.sortBy,
                 SortOrder: sortValues.sortOrder
-            }
+            },
+            playAudioOnly: audioOnly
         });
     }
 }

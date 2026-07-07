@@ -98,7 +98,7 @@ function updateNowPlayingInfo(context, state, serverId) {
         '';
     if (item) {
         const nowPlayingServerId = (item.ServerId || serverId);
-        if (item.Type == 'AudioBook' || item.Type == 'Audio' || item.MediaStreams[0].Type == 'Audio') {
+        if (item.Type == 'AudioBook' || item.Type == 'Audio' || item.MediaStreams?.[0]?.Type == 'Audio') {
             let artistsSeries = '';
             let albumName = '';
             if (item.Artists != null) {

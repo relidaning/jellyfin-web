@@ -1404,6 +1404,7 @@
     "PlaceFavoriteChannelsAtBeginning": "Place favorite channels at the beginning",
     "Play": "Play",
     "PlayAllFromHere": "Play all from here",
+    "PlayAudioOnly": "Play audio only",
     "PlaybackData": "Playback Info",
     "PlaybackError.ASS_RENDER_ERROR": "An error was encountered in the ASS/SSA subtitle renderer.",
     "PlaybackError.FATAL_HLS_ERROR": "A fatal error was encountered in the HLS stream.",

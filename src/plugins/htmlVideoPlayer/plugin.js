@@ -631,6 +631,10 @@ export class HtmlVideoPlayer {
     seekToSubtitleCue(cue) {
         if (cue && this.#mediaElement) {
             this.currentTime(cue.startTime * 1000);
+            // `timeupdate` (which refreshes the cached time used by currentTime())
+            // fires asynchronously and barely at all while paused, so update it here
+            // too - otherwise back-to-back cue jumps recompute from a stale position.
+            this.#currentTime = cue.startTime;
         }
     }
 

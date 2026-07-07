@@ -353,6 +353,29 @@ function getAudioStreamUrlFromDeviceProfile(item, deviceProfile, maxBitrate, api
     return getAudioStreamUrl(item, transcodingProfile, directPlayContainers, apiClient, startPosition, { maxBitrate, ...maxValues });
 }
 
+// Used to strip the video stream out of a Video item for audio-only playback.
+// Deliberately forces progressive (non-HLS) transcoding: the server's HLS master
+// playlist endpoint throws for sources with no native audio-only representation,
+// since it isn't built to handle a non-audio source item.
+function getVideoAudioOnlyStreamUrl(item, apiClient, startPosition) {
+    const url = 'Audio/' + item.Id + '/universal';
+
+    startingPlaySession++;
+    return apiClient.getUrl(url, {
+        UserId: apiClient.getCurrentUserId(),
+        DeviceId: apiClient.deviceId(),
+        Container: 'mp3',
+        TranscodingContainer: 'mp3',
+        TranscodingProtocol: 'http',
+        AudioCodec: 'mp3',
+        ApiKey: apiClient.accessToken(),
+        PlaySessionId: startingPlaySession,
+        StartTimeTicks: startPosition || 0,
+        EnableRedirection: true,
+        EnableRemoteMedia: appHost.supports(AppFeature.RemoteAudio)
+    });
+}
+
 function getStreamUrls(items, deviceProfile, maxBitrate, apiClient, startPosition) {
     const audioTranscodingProfile = deviceProfile.TranscodingProfiles.filter(function (p) {
         return p.Type === 'Audio' && p.Context === 'Streaming';
@@ -415,6 +438,18 @@ function setStreamUrls(items, deviceProfile, maxBitrate, apiClient, startPositio
 }
 
 async function getPlaybackInfo(player, apiClient, item, deviceProfile, mediaSourceId, liveStreamId, options) {
+    if (!itemHelper.isLocalItem(item) && options.playAudioOnly) {
+        return {
+            MediaSources: [
+                {
+                    StreamUrl: getVideoAudioOnlyStreamUrl(item, apiClient, options.startPosition),
+                    Id: item.Id,
+                    MediaStreams: [],
+                    RunTimeTicks: item.RunTimeTicks
+                }]
+        };
+    }
+
     if (!itemHelper.isLocalItem(item) && item.MediaType === 'Audio' && !player.useServerPlaybackInfoForAudio) {
         return {
             MediaSources: [
@@ -655,7 +690,8 @@ function truncatePlayOptions(playOptions) {
         mediaSourceId: playOptions.mediaSourceId,
         audioStreamIndex: playOptions.audioStreamIndex,
         subtitleStreamIndex: playOptions.subtitleStreamIndex,
-        startPositionTicks: playOptions.startPositionTicks
+        startPositionTicks: playOptions.startPositionTicks,
+        playAudioOnly: playOptions.playAudioOnly
     };
 }
 
@@ -2325,7 +2361,8 @@ export class PlaybackManager {
 
                 if (introItems.length) {
                     introPlayOptions = {
-                        fullscreen: firstItem.playOptions.fullscreen
+                        fullscreen: firstItem.playOptions.fullscreen,
+                        playAudioOnly: firstItem.playOptions.playAudioOnly
                     };
                 } else {
                     introPlayOptions = firstItem.playOptions;
@@ -2364,6 +2401,10 @@ export class PlaybackManager {
             normalizePlayOptions(playOptions);
 
             playOptions.isFirstItem = playOptions.isFirstItem || !prevSource;
+
+            if (playOptions.playAudioOnly && item.MediaType === 'Video' && !itemHelper.isLocalItem(item)) {
+                item = Object.assign({}, item, { MediaType: 'Audio' });
+            }
 
             // TODO: This should be the media type requested, not the original media type
             const mediaType = item.MediaType;
@@ -2672,7 +2713,8 @@ export class PlaybackManager {
                     enableDirectPlay: null,
                     enableDirectStream: null,
                     allowVideoStreamCopy: null,
-                    allowAudioStreamCopy: null
+                    allowAudioStreamCopy: null,
+                    playAudioOnly: playOptions.playAudioOnly
                 };
 
                 if (player && !enableLocalPlaylistManagement(player)) {
