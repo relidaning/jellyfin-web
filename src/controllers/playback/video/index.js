@@ -218,6 +218,7 @@ export default function (view) {
             view.querySelector('.btnSubtitles').classList.add('hide');
             toggleSubtitleSync('forceToHide');
         }
+        updateSubtitleCueButtons(player);
 
         if (playbackManager.audioTracks(player).length > 1) {
             view.querySelector('.btnAudio').classList.remove('hide');
@@ -232,6 +233,16 @@ export default function (view) {
             view.querySelector('.btnPreviousChapter').classList.add('hide');
             view.querySelector('.btnNextChapter').classList.add('hide');
         }
+    }
+
+    function updateSubtitleCueButtons(player) {
+        const buttons = [btnPreviousSubtitle, btnRepeatSubtitle, btnNextSubtitle];
+        const hasSubtitleCueNavigation = player?.supportsSubtitleCueNavigation?.() === true;
+
+        buttons.forEach((button) => {
+            button.classList.toggle('hide', !hasSubtitleCueNavigation);
+            button.disabled = !hasSubtitleCueNavigation;
+        });
     }
 
     function setTitle(item, parentName) {
@@ -637,6 +648,7 @@ export default function (view) {
                 currentRuntimeTicks = playbackManager.duration(player);
                 const currentTime = playbackManager.currentTime(player) * 10000;
                 updateTimeDisplay(currentTime, currentRuntimeTicks, playbackManager.playbackStartTime(player), playbackManager.getPlaybackRate(player), playbackManager.getBufferedRanges(player));
+                updateSubtitleCueButtons(player);
                 const item = currentItem;
                 refreshProgramInfoIfNeeded(player, item);
                 showComingUpNextIfNeeded(player, item, currentTime, currentRuntimeTicks);
@@ -1351,6 +1363,30 @@ export default function (view) {
                     playbackManager.toggleMute(currentPlayer);
                 }
                 break;
+            case 'KeyA':
+            case 'a':
+                if (!e.shiftKey) {
+                    e.preventDefault();
+                    currentPlayer?.previousSubtitleCue?.();
+                    showOsd(btnPreviousSubtitle);
+                }
+                break;
+            case 'KeyS':
+            case 's':
+                if (!e.shiftKey) {
+                    e.preventDefault();
+                    currentPlayer?.repeatSubtitleCue?.();
+                    showOsd(btnRepeatSubtitle);
+                }
+                break;
+            case 'KeyD':
+            case 'd':
+                if (!e.shiftKey) {
+                    e.preventDefault();
+                    currentPlayer?.nextSubtitleCue?.();
+                    showOsd(btnNextSubtitle);
+                }
+                break;
             case 'KeyP':
                 if (e.shiftKey) {
                     e.preventDefault();
@@ -1420,8 +1456,42 @@ export default function (view) {
         }
     }
 
-    function onKeyDownCapture() {
+    function onKeyDownCapture(e) {
         resetIdle();
+
+        if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) {
+            return;
+        }
+
+        if (getOpenedDialog()) {
+            return;
+        }
+
+        const key = keyboardnavigation.getKeyName(e);
+
+        switch (key) {
+            case 'KeyA':
+            case 'a':
+                e.preventDefault();
+                e.stopPropagation();
+                currentPlayer?.previousSubtitleCue?.();
+                showOsd(btnPreviousSubtitle);
+                break;
+            case 'KeyS':
+            case 's':
+                e.preventDefault();
+                e.stopPropagation();
+                currentPlayer?.repeatSubtitleCue?.();
+                showOsd(btnRepeatSubtitle);
+                break;
+            case 'KeyD':
+            case 'd':
+                e.preventDefault();
+                e.stopPropagation();
+                currentPlayer?.nextSubtitleCue?.();
+                showOsd(btnNextSubtitle);
+                break;
+        }
     }
 
     function onWheel(e) {
@@ -1642,6 +1712,9 @@ export default function (view) {
     const endsAtText = view.querySelector('.endsAtText');
     const btnRewind = view.querySelector('.btnRewind');
     const btnFastForward = view.querySelector('.btnFastForward');
+    const btnPreviousSubtitle = view.querySelector('.btnPreviousSubtitle');
+    const btnRepeatSubtitle = view.querySelector('.btnRepeatSubtitle');
+    const btnNextSubtitle = view.querySelector('.btnNextSubtitle');
     const transitionEndEventName = dom.whichTransitionEvent();
     const headerElement = document.querySelector('.skinHeader');
     const osdBottomElement = view.querySelector('.videoOsdBottom-maincontrols');
@@ -1671,8 +1744,7 @@ export default function (view) {
             inputManager.on(window, onInputCommand);
             document.addEventListener('keydown', onKeyDown);
             dom.addEventListener(document, 'keydown', onKeyDownCapture, {
-                capture: true,
-                passive: true
+                capture: true
             });
             document.addEventListener('wheel', onWheel);
             /* eslint-disable-next-line compat/compat */
@@ -1714,8 +1786,7 @@ export default function (view) {
 
         document.removeEventListener('keydown', onKeyDown);
         dom.removeEventListener(document, 'keydown', onKeyDownCapture, {
-            capture: true,
-            passive: true
+            capture: true
         });
         document.removeEventListener('wheel', onWheel);
         /* eslint-disable-next-line compat/compat */
@@ -1934,8 +2005,17 @@ export default function (view) {
     view.querySelector('.btnPreviousChapter').addEventListener('click', function () {
         playbackManager.previousChapter(currentPlayer);
     });
+    btnPreviousSubtitle.addEventListener('click', function () {
+        currentPlayer?.previousSubtitleCue?.();
+    });
     view.querySelector('.btnPause').addEventListener('click', function () {
         playbackManager.playPause(currentPlayer);
+    });
+    btnRepeatSubtitle.addEventListener('click', function () {
+        currentPlayer?.repeatSubtitleCue?.();
+    });
+    btnNextSubtitle.addEventListener('click', function () {
+        currentPlayer?.nextSubtitleCue?.();
     });
     view.querySelector('.btnNextChapter').addEventListener('click', function () {
         playbackManager.nextChapter(currentPlayer);

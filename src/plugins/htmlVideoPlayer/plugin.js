@@ -595,6 +595,70 @@ export class HtmlVideoPlayer {
         }
     }
 
+    /**
+     * @private
+     */
+    getPrimarySubtitleCues() {
+        if (this.#currentTrackEvents?.length) {
+            return this.#currentTrackEvents
+                .map(trackEvent => ({
+                    startTime: trackEvent.StartPositionTicks / 10000000,
+                    endTime: trackEvent.EndPositionTicks / 10000000
+                }))
+                .filter(cue => cue.endTime > cue.startTime);
+        }
+
+        const track = this.getTextTracks()?.[PRIMARY_TEXT_TRACK_INDEX];
+        if (!track?.cues?.length) {
+            return [];
+        }
+
+        return Array.from(track.cues)
+            .map(cue => ({
+                startTime: cue.startTime,
+                endTime: cue.endTime
+            }))
+            .filter(cue => cue.endTime > cue.startTime);
+    }
+
+    supportsSubtitleCueNavigation() {
+        return this.getPrimarySubtitleCues().length > 0;
+    }
+
+    /**
+     * @private
+     */
+    seekToSubtitleCue(cue) {
+        if (cue && this.#mediaElement) {
+            this.currentTime(cue.startTime * 1000);
+        }
+    }
+
+    repeatSubtitleCue() {
+        const cues = this.getPrimarySubtitleCues();
+        const currentTime = (this.currentTime() || 0) / 1000;
+        const cue = cues.find(({ startTime, endTime }) => currentTime >= startTime && currentTime < endTime)
+            || cues.find(({ startTime }) => startTime >= currentTime);
+
+        this.seekToSubtitleCue(cue);
+    }
+
+    previousSubtitleCue() {
+        const cues = this.getPrimarySubtitleCues();
+        const currentTime = (this.currentTime() || 0) / 1000;
+        const previousCues = cues.filter(({ startTime }) => startTime < currentTime - 0.5);
+
+        this.seekToSubtitleCue(previousCues[previousCues.length - 1] || cues[0]);
+    }
+
+    nextSubtitleCue() {
+        const cues = this.getPrimarySubtitleCues();
+        const currentTime = (this.currentTime() || 0) / 1000;
+        const cue = cues.find(({ startTime }) => startTime > currentTime + 0.1);
+
+        this.seekToSubtitleCue(cue);
+    }
+
     setSubtitleOffset = debounce(this._setSubtitleOffset, 100);
 
     /**
