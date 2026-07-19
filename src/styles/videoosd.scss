@@ -129,6 +129,23 @@
     }
 }
 
+.btnPreviousSubtitle,
+.btnRepeatSubtitle,
+.btnNextSubtitle {
+    position: relative;
+
+    .subtitleCueBadge {
+        position: absolute;
+        right: 0.55em;
+        bottom: 0.5em;
+        font-size: 0.85em;
+        font-weight: 700;
+        line-height: 1;
+        pointer-events: none;
+        text-shadow: 0 0 4px #000, 0 0 2px #000;
+    }
+}
+
 .osdVolumeSliderContainer {
     width: 9em;
     flex-grow: 1;

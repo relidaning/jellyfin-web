@@ -25,3 +25,11 @@ that assumed `item.MediaStreams[0].Type` is always audio-native (e.g.
 `remotecontrol.js`'s Now Playing page) — guard such accesses with optional
 chaining rather than assuming `MediaType === 'Audio'` implies a native audio
 source.
+
+## Hotkey choice constraint
+The user browses with Vimium (stock config). Any single-letter player hotkey
+bound to a Vimium default (d, u, j, k, f, x, r, t, o, b, p, y, i, v, h, l, g,
+m, n, /, ?) is swallowed by Vimium's content script before page listeners run
+— no app-side workaround exists. Current cue-navigation keys: `a` and `s` are
+safe; `d` requires a Vimium exclusion rule on the user's side. Prefer unbound
+letters (a, s, e, w, q, c, z) for new hotkeys.
