@@ -38,6 +38,28 @@ function playTrailers(apiClient, itemId) {
     });
 }
 
+// SendKey names for this fork's subtitle-cue navigation, mapped to the video
+// player's methods (the same ones the OSD buttons and a/s/d hotkeys call)
+const subtitleCueKeys = {
+    PreviousSubtitleCue: 'previousSubtitleCue',
+    RepeatSubtitleCue: 'repeatSubtitleCue',
+    NextSubtitleCue: 'nextSubtitleCue'
+};
+
+// SendKey is this fork's channel for remote-pad actions the server has no
+// command for (see remotecontrol.js)
+function sendKey(args = {}) {
+    const method = subtitleCueKeys[args.Key];
+    if (method) {
+        playbackManager.getCurrentPlayer()?.[method]?.();
+    } else if (args.Key === 'SetPlaybackRate') {
+        const rate = parseFloat(args.Rate);
+        if (Number.isFinite(rate)) playbackManager.setPlaybackRate(rate);
+    } else {
+        console.debug('sendKey does not recognize: ' + args.Key);
+    }
+}
+
 function processGeneralCommand(cmd, apiClient) {
     console.debug('Received command: ' + cmd.Name);
     switch (cmd.Name) {
@@ -127,8 +149,10 @@ function processGeneralCommand(cmd, apiClient) {
             break;
         case 'ToggleOsd':
         case 'ToggleContextMenu':
-        case 'SendKey':
             // todo
+            break;
+        case 'SendKey':
+            sendKey(cmd.Arguments);
             break;
         case 'SendString':
             focusManager.sendText(cmd.Arguments.String);

@@ -5,6 +5,10 @@ export interface PlayTarget {
     id: string
     name: string
     appName?: string
+    /** Stable id of the device behind a session (sessions come and go) */
+    deviceId?: string
+    /** Name of the item this session is playing, if any */
+    nowPlayingName?: string
     playerName?: string
     deviceType?: string
     isLocalPlayer?: boolean

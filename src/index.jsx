@@ -16,6 +16,7 @@ import { AppFeature } from 'constants/appFeature';
 import globalize from './lib/globalize';
 import { loadCoreDictionary } from 'lib/globalize/loader';
 import { initialize as initializeAutoCast } from 'scripts/autocast';
+import { initialize as initializeRemoteTarget } from 'scripts/remoteTarget';
 import browser from './scripts/browser';
 import keyboardNavigation from './scripts/keyboardNavigation';
 import { getPlugins } from './scripts/settings/webSettings';
@@ -77,6 +78,8 @@ build: ${__JF_BUILD_VERSION__}`);
 
     // Initialize automatic (default) cast target
     initializeAutoCast();
+    // Keep a phone remote attached to the device it controls
+    initializeRemoteTarget();
 
     // Load the translation dictionary
     await loadCoreDictionary();

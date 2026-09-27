@@ -20,6 +20,7 @@ import itemContextMenu from '../itemContextMenu';
 import toast from '../toast/toast';
 import { appRouter } from '../router/appRouter';
 import { getDefaultBackgroundClass } from '../cardbuilder/utils/builder';
+import { enableKeepScreenAwake, disableKeepScreenAwake } from './keepScreenAwake';
 
 import '../cardbuilder/card.scss';
 import '../../elements/emby-button/emby-button';
@@ -55,7 +56,7 @@ function showAudioMenu(context, player, button) {
             callback: function (id) {
                 playbackManager.setAudioStreamIndex(parseInt(id, 10), player);
             }
-        });
+        }).catch(() => { /* closed without choosing */ });
     });
 }
 
@@ -87,7 +88,7 @@ function showSubtitleMenu(context, player, button) {
             callback: function (id) {
                 playbackManager.setSubtitleStreamIndex(parseInt(id, 10), player);
             }
-        });
+        }).catch(() => { /* closed without choosing */ });
     });
 }
 
@@ -280,13 +281,15 @@ export default function () {
             context.querySelector('.remoteControlSection').classList.add('hide');
         }
 
+        updateRemotePad(player, context, item);
+
         buttonVisible(context.querySelector('.btnLyrics'), item?.Type === 'Audio' && !layoutManager.mobile);
         buttonVisible(context.querySelector('.btnStop'), item != null);
         buttonVisible(context.querySelector('.btnNextTrack'), item != null);
         buttonVisible(context.querySelector('.btnPreviousTrack'), item != null);
         if (layoutManager.mobile) {
-            const playingVideo = playbackManager.isPlayingVideo() && item !== null;
-            const playingAudio = !playbackManager.isPlayingVideo() && item !== null;
+            const playingVideo = playbackManager.isPlayingVideo() && item != null;
+            const playingAudio = !playbackManager.isPlayingVideo() && item != null;
             const playingAudioBook = playingAudio && item.Type == 'AudioBook';
             buttonVisible(context.querySelector('.btnRepeat'), playingAudio && !playingAudioBook);
             buttonVisible(context.querySelector('.btnShuffleQueue'), playingAudio && !playingAudioBook);
@@ -324,6 +327,303 @@ export default function () {
         updateRepeatModeDisplay(playbackManager.getRepeatMode());
         onShuffleQueueModeChange(false);
         updateNowPlayingInfo(context, state);
+    }
+
+    // Remote pad: the default layout of this page, for controlling another
+    // session and for video on this device. Only music playing on this device
+    // keeps the stock player (a ring of subtitle/episode buttons is no use there).
+    function updateRemotePad(player, context, item) {
+        const isLocalMusic = currentPlayer?.isLocalPlayer && item?.MediaType === 'Audio';
+        const padMode = !isLocalMusic;
+        context.classList.toggle('remotePadMode', padMode);
+        context.querySelector('.remotePad').classList.toggle('hide', !padMode);
+        context.querySelector('.remotePadBackdrop').classList.toggle('hide', !padMode);
+        placeProgressBar(context, padMode);
+
+        if (!padMode) {
+            leavePadMode();
+            return;
+        }
+
+        if (!inPadMode) {
+            inPadMode = true;
+            enableKeepScreenAwake();
+            // more room for the remote; double-tap empty space brings the bar back
+            document.body.classList.add('remotePadHeaderHidden');
+            lockViewport(true);
+        }
+
+        // nothing playing (or not reported yet): show the menu bar so there's
+        // a way to go somewhere else
+        if (!item) {
+            document.body.classList.remove('remotePadHeaderHidden');
+            return;
+        }
+
+        if (item.Id !== padItemId) {
+            padItemId = item.Id;
+            setBackdrop(context, item);
+            loadAdjacentEpisodes(context, item);
+        }
+
+        const supportedCommands = currentPlayerSupportedCommands;
+        const isVideo = item.MediaType == 'Video';
+        buttonVisible(context.querySelector('.btnRemotePadSubtitles'), isVideo && supportedCommands.includes('SetSubtitleStreamIndex'));
+        context.querySelector('.btnRemotePadSubtitles').disabled = !playbackManager.subtitleTracks(player).length;
+        buttonVisible(context.querySelector('.btnRemotePadAudio'), supportedCommands.includes('SetAudioStreamIndex'));
+        context.querySelector('.btnRemotePadAudio').disabled = playbackManager.audioTracks(player).length < 2;
+        buttonVisible(context.querySelector('.btnRemotePadFullscreen'), isVideo && supportedCommands.includes('ToggleFullscreen'));
+    }
+
+    function leavePadMode() {
+        if (inPadMode) {
+            inPadMode = false;
+            padItemId = null;
+            disableKeepScreenAwake();
+            document.body.classList.remove('remotePadHeaderHidden');
+            lockViewport(false);
+        }
+    }
+
+    // A remote shouldn't zoom or scroll under the thumb. iOS Safari ignores the
+    // page's user-scalable=no, so pinch (gesturestart) and stray touchmoves are
+    // cancelled while the pad is up; the progress slider and open menus still
+    // get theirs.
+
+    function preventDefault(e) {
+        e.preventDefault();
+    }
+
+    function preventPageScroll(e) {
+        if (!e.target.closest?.('.sliderContainer, .dialogContainer, .actionSheet')) {
+            e.preventDefault();
+        }
+    }
+
+    function lockViewport(lock) {
+        if (lock) {
+            document.documentElement.classList.add('remotePadLocked');
+            document.addEventListener('gesturestart', preventDefault, { passive: false });
+            document.addEventListener('touchmove', preventPageScroll, { passive: false });
+        } else {
+            document.documentElement.classList.remove('remotePadLocked');
+            document.removeEventListener('gesturestart', preventDefault);
+            document.removeEventListener('touchmove', preventPageScroll);
+        }
+    }
+
+    // The pad shows the progress bar under the ring; move the stock one there
+    // (and back) so its existing bindings keep working
+    function placeProgressBar(context, padMode) {
+        const bar = context.querySelector('.nowPlayingPositionSlider').closest('.sliderContainer');
+        if (!progressBarHome) {
+            progressBarHome = { parent: bar.parentNode, next: bar.nextSibling };
+        }
+        if (padMode) {
+            context.querySelector('.remotePadProgress').appendChild(bar);
+        } else if (bar.parentNode !== progressBarHome.parent) {
+            progressBarHome.parent.insertBefore(bar, progressBarHome.next);
+        }
+    }
+
+    function getRingIcon(context, action) {
+        return context.querySelector(`.remoteRingIcon[data-icon-for="${action}"] .material-icons`);
+    }
+
+    function setRingButtonEnabled(context, action, enabled) {
+        context.querySelector(`.remoteRingButton[data-action="${action}"]`).classList.toggle('disabled', !enabled);
+        context.querySelector(`.remoteRingIcon[data-icon-for="${action}"]`).classList.toggle('disabled', !enabled);
+    }
+
+    // Blurred artwork behind the pad. The session's NowPlayingItem often lacks
+    // image tags (episodes especially), so look the full item up.
+    function setBackdrop(context, item) {
+        const elem = context.querySelector('.remotePadBackdrop');
+        elem.style.setProperty('--remotepad-art', 'none');
+        const apiClient = ServerConnections.getApiClient(item.ServerId);
+        apiClient.getItem(apiClient.getCurrentUserId(), item.Id).then(full => {
+            if (full.Id !== padItemId) return;
+            const image = (id, type, tag) => apiClient.getScaledImageUrl(id, { type, tag, maxWidth: 720 });
+            let url = null;
+            if (full.BackdropImageTags?.length) {
+                url = image(full.Id, 'Backdrop', full.BackdropImageTags[0]);
+            } else if (full.ParentBackdropItemId && full.ParentBackdropImageTags?.length) {
+                url = image(full.ParentBackdropItemId, 'Backdrop', full.ParentBackdropImageTags[0]);
+            } else if (full.ImageTags?.Primary) {
+                url = image(full.Id, 'Primary', full.ImageTags.Primary);
+            } else if (full.SeriesId && full.SeriesPrimaryImageTag) {
+                url = image(full.SeriesId, 'Primary', full.SeriesPrimaryImageTag);
+            }
+            elem.style.setProperty('--remotepad-art', url ? `url("${url}")` : 'none');
+        }).catch(err => {
+            console.error('[remotecontrol] failed to load artwork', err);
+        });
+    }
+
+    // Previous/next episode come from the series' episode order, so they work
+    // even when the laptop's play queue only holds the current episode
+    function loadAdjacentEpisodes(context, item) {
+        adjacentEpisodes = {};
+        setRingButtonEnabled(context, 'previousEpisode', false);
+        setRingButtonEnabled(context, 'nextEpisode', false);
+        if (item.Type !== 'Episode' || !item.SeriesId) return;
+
+        const apiClient = ServerConnections.getApiClient(item.ServerId);
+        apiClient.getEpisodes(item.SeriesId, {
+            UserId: apiClient.getCurrentUserId(),
+            AdjacentTo: item.Id
+        }).then(result => {
+            if (item.Id !== padItemId) return;
+            const episodes = result.Items || [];
+            const index = episodes.findIndex(e => e.Id === item.Id);
+            adjacentEpisodes = {
+                previous: index > 0 ? episodes[index - 1] : null,
+                next: index !== -1 ? episodes[index + 1] : null
+            };
+            setRingButtonEnabled(context, 'previousEpisode', !!adjacentEpisodes.previous);
+            setRingButtonEnabled(context, 'nextEpisode', !!adjacentEpisodes.next);
+        }).catch(err => {
+            console.error('[remotecontrol] failed to load adjacent episodes', err);
+        });
+    }
+
+    function playOnTarget(item) {
+        playbackManager.play({ ids: [item.Id], serverId: item.ServerId });
+        toast(item.Name);
+    }
+
+    function playEpisode(which) {
+        const episode = adjacentEpisodes[which];
+        if (episode) {
+            playOnTarget({ Id: episode.Id, Name: episode.Name, ServerId: lastPlayerState.NowPlayingItem.ServerId });
+        }
+    }
+
+    // Random item from the same place: another episode of the same series, or
+    // for anything else another item of the same type from the same library
+    async function playRandom() {
+        const item = lastPlayerState?.NowPlayingItem;
+        if (!item) return;
+
+        const apiClient = ServerConnections.getApiClient(item.ServerId);
+        const userId = apiClient.getCurrentUserId();
+        let parentId = item.SeriesId;
+        if (item.Type !== 'Episode' || !parentId) {
+            const ancestors = await apiClient.getAncestorItems(item.Id, userId);
+            parentId = ancestors.find(a => a.Type === 'CollectionFolder')?.Id;
+        }
+
+        const result = await apiClient.getItems(userId, {
+            ParentId: parentId,
+            Recursive: true,
+            IncludeItemTypes: item.Type,
+            ExcludeItemIds: item.Id,
+            SortBy: 'Random',
+            Limit: 1
+        });
+        const pick = result.Items?.[0];
+        if (pick) {
+            playOnTarget({ Id: pick.Id, Name: pick.Name, ServerId: item.ServerId });
+        } else {
+            toast('Nothing else to play here');
+        }
+    }
+
+    function showSpeedMenu(button) {
+        const speeds = [0.5, 0.75, 1, 1.25, 1.5];
+        import('../actionSheet/actionSheet').then(({ default: actionsheet }) => actionsheet.show({
+            title: 'Playback speed',
+            items: speeds.map(rate => ({ name: rate + 'x', id: String(rate), selected: rate === playbackRate })),
+            positionTo: button
+        })).then(id => {
+            if (id) {
+                playbackRate = parseFloat(id);
+                sendPlayerKey('SetPlaybackRate', { Rate: id });
+            }
+        }).catch(() => { /* closed */ });
+    }
+
+    function showSettingsMenu(context, button) {
+        import('../actionSheet/actionSheet').then(({ default: actionsheet }) => actionsheet.show({
+            title: globalize.translate('Settings'),
+            items: [
+                { name: `Playback speed (${playbackRate}x)`, id: 'speed', icon: 'speed' },
+                { name: document.body.classList.contains('remotePadHeaderHidden') ? 'Show menu bar' : 'Hide menu bar', id: 'header', icon: 'web_asset' },
+                { name: 'Jellyfin settings', id: 'app', icon: 'settings' }
+            ],
+            positionTo: button
+        })).then(id => {
+            if (id === 'speed') {
+                showSpeedMenu(button);
+            } else if (id === 'header') {
+                document.body.classList.toggle('remotePadHeaderHidden');
+            } else if (id === 'app') {
+                appRouter.showSettings();
+            }
+        }).catch(() => { /* closed */ });
+    }
+
+    // Double-tap on empty space (not a control) toggles the top bar
+    function bindHeaderDoubleTap(context) {
+        let lastTap = null;
+        context.addEventListener('pointerup', (e) => {
+            if (!inPadMode || e.target.closest('button, a, input, .remoteRingButton, .sliderContainer')) {
+                lastTap = null;
+                return;
+            }
+            const now = Date.now();
+            if (lastTap && now - lastTap.time < 350 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) {
+                document.body.classList.toggle('remotePadHeaderHidden');
+                lastTap = null;
+            } else {
+                lastTap = { time: now, x: e.clientX, y: e.clientY };
+            }
+        });
+    }
+
+    // Volume in big steps with an instant readout. The player's own volumeUp/Down
+    // move 2% (inaudible), and a remote session only reports the new level back
+    // ~1s later, so taps set an absolute level computed from the last one sent.
+    const VOLUME_STEP = 10;
+
+    function stepVolume(context, delta) {
+        const reported = lastPlayerState?.PlayState?.VolumeLevel;
+        const base = Date.now() < pendingVolumeUntil ? pendingVolume : (reported ?? 100);
+        pendingVolume = Math.min(100, Math.max(0, Math.round(base + delta)));
+        pendingVolumeUntil = Date.now() + 2500;
+        playbackManager.setVolume(pendingVolume, currentPlayer);
+        showVolumeBubble(context, pendingVolume);
+    }
+
+    function showVolumeBubble(context, level) {
+        const bubble = context.querySelector('.remotePadVolumeBubble');
+        const icon = bubble.querySelector('.remotePadVolumeIcon');
+        icon.classList.toggle('volume_off', level === 0);
+        icon.classList.toggle('volume_up', level !== 0);
+        bubble.querySelector('.remotePadVolumeValue').textContent = level + '%';
+        bubble.querySelector('.remotePadVolumeFill').style.width = level + '%';
+        bubble.classList.add('visible');
+        clearTimeout(volumeBubbleTimer);
+        volumeBubbleTimer = setTimeout(() => bubble.classList.remove('visible'), 1200);
+    }
+
+    // SendKey commands this fork's video player understands (serverNotifications.js)
+    // (for this device's own player the same actions are called directly)
+    function sendPlayerKey(key, args = {}) {
+        if (currentPlayer?.isLocalPlayer) {
+            if (key === 'SetPlaybackRate') {
+                playbackManager.setPlaybackRate(parseFloat(args.Rate), currentPlayer);
+            } else {
+                const method = key.charAt(0).toLowerCase() + key.slice(1);
+                currentPlayer[method]?.();
+            }
+            return;
+        }
+
+        playbackManager.sendCommand({
+            Name: 'SendKey',
+            Arguments: { Key: key, ...args }
+        }, currentPlayer);
     }
 
     function updateAudioTracksDisplay(player, context) {
@@ -417,6 +717,10 @@ export default function () {
         btnPlayPauseIcon.classList.remove('play_circle_filled', 'pause_circle_filled');
         btnPlayPauseIcon.classList.add(isPaused ? 'play_circle_filled' : 'pause_circle_filled');
 
+        const padPlayIcon = getRingIcon(context, 'playPause');
+        padPlayIcon.classList.toggle('play_arrow', !!isPaused);
+        padPlayIcon.classList.toggle('pause', !isPaused);
+
         const playlistIndicator = context.querySelector('.playlistIndexIndicatorImage');
         if (playlistIndicator) {
             playlistIndicator.classList.toggle('playlistIndexIndicatorPausedImage', isPaused);
@@ -438,6 +742,10 @@ export default function () {
                 positionSlider.value = 0;
             }
         }
+
+        const arc = context.querySelector('.remoteRingArc');
+        const arcPct = runtimeTicks ? Math.min(100, Math.max(0, positionTicks / runtimeTicks * 100)) : 0;
+        arc.setAttribute('stroke-dasharray', `${arcPct} 100`);
 
         context.querySelector('.positionTime').innerHTML = Number.isFinite(positionTicks) ? datetime.getDisplayRunningTime(positionTicks) : '--:--';
         context.querySelector('.runtime').innerHTML = Number.isFinite(runtimeTicks) ? datetime.getDisplayRunningTime(runtimeTicks) : '--:--';
@@ -683,6 +991,67 @@ export default function () {
         });
     }
 
+    function bindRemotePadEvents(context) {
+        const ringActions = {
+            volumeUp: () => stepVolume(context, VOLUME_STEP),
+            volumeDown: () => stepVolume(context, -VOLUME_STEP),
+            previousSubtitle: () => sendPlayerKey('PreviousSubtitleCue'),
+            repeatSubtitle: () => sendPlayerKey('RepeatSubtitleCue'),
+            nextSubtitle: () => sendPlayerKey('NextSubtitleCue'),
+            rewind: () => playbackManager.rewind(currentPlayer),
+            fastForward: () => playbackManager.fastForward(currentPlayer),
+            playPause: () => playbackManager.playPause(currentPlayer),
+            previousEpisode: () => playEpisode('previous'),
+            nextEpisode: () => playEpisode('next')
+        };
+
+        for (const btn of context.querySelectorAll('.remoteRingButton')) {
+            btn.addEventListener('pointerdown', () => btn.classList.add('pressed'));
+            for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+                btn.addEventListener(type, () => btn.classList.remove('pressed'));
+            }
+            btn.addEventListener('click', () => {
+                if (currentPlayer) {
+                    ringActions[btn.getAttribute('data-action')]();
+                }
+            });
+            btn.addEventListener('keydown', (e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && currentPlayer) {
+                    e.preventDefault();
+                    ringActions[btn.getAttribute('data-action')]();
+                }
+            });
+        }
+
+        const onClick = (selector, fn) => {
+            context.querySelector(selector).addEventListener('click', function (e) {
+                if (currentPlayer) {
+                    fn(e);
+                }
+            });
+        };
+
+        onClick('.btnRemotePadStop', () => playbackManager.stop(currentPlayer));
+        onClick('.btnRemotePadShuffle', () => {
+            playRandom().catch(err => {
+                console.error('[remotecontrol] failed to pick a random item', err);
+            });
+        });
+        onClick('.btnRemotePadSettings', (e) => showSettingsMenu(context, e.currentTarget));
+        bindHeaderDoubleTap(context);
+        onClick('.btnRemotePadFullscreen', () => playbackManager.toggleFullscreen(currentPlayer));
+        onClick('.btnRemotePadSubtitles', (e) => {
+            if (lastPlayerState?.NowPlayingItem) {
+                showSubtitleMenu(context, currentPlayer, e.currentTarget);
+            }
+        });
+        onClick('.btnRemotePadAudio', (e) => {
+            if (lastPlayerState?.NowPlayingItem) {
+                showAudioMenu(context, currentPlayer, e.currentTarget);
+            }
+        });
+    }
+
     function bindEvents(context) {
         const btnCommand = context.querySelectorAll('.btnCommand');
         const positionSlider = context.querySelector('.nowPlayingPositionSlider');
@@ -731,6 +1100,8 @@ export default function () {
                 playbackManager.fastForward(currentPlayer);
             }
         });
+        bindRemotePadEvents(context);
+
         context.querySelector('.btnLyrics').addEventListener('click', function () {
             appRouter.show('lyrics');
         });
@@ -893,6 +1264,8 @@ export default function () {
         }
 
         bindEvents(context);
+        // the pad is the default layout, so the progress bar starts under the ring
+        placeProgressBar(context, true);
         context.querySelector('.sendMessageForm').addEventListener('submit', onMessageSubmit);
         context.querySelector('.typeTextForm').addEventListener('submit', onSendStringSubmit);
         Events.on(playbackManager, 'playerchange', onPlayerChange);
@@ -905,6 +1278,7 @@ export default function () {
     }
 
     function onDialogClosed() {
+        leavePadMode();
         releaseCurrentPlayer();
         Events.off(playbackManager, 'playerchange', onPlayerChange);
         lastPlayerState = null;
@@ -920,6 +1294,14 @@ export default function () {
     let currentPlayerSupportedCommands = [];
     let lastUpdateTime = 0;
     let currentRuntimeTicks = 0;
+    let progressBarHome;
+    let padItemId;
+    let inPadMode = false;
+    let adjacentEpisodes = {};
+    let playbackRate = 1;
+    let pendingVolume = 100;
+    let pendingVolumeUntil = 0;
+    let volumeBubbleTimer;
     const self = this;
 
     self.init = function (ownerView, context) {

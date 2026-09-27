@@ -75,6 +75,17 @@ function sendCommandByName(instance, name, options) {
     instance.sendCommand(command);
 }
 
+// Short label for the cast menu: episode titles alone ("Episode #1.2") don't
+// say much, so episodes show series + number instead
+function getNowPlayingName(item) {
+    if (!item) return undefined;
+    if (item.SeriesName && item.IndexNumber != null) {
+        const season = item.ParentIndexNumber != null ? `S${item.ParentIndexNumber}` : '';
+        return `${item.SeriesName} ${season}E${item.IndexNumber}`;
+    }
+    return item.Name;
+}
+
 function unsubscribeFromPlayerUpdates(instance) {
     instance.isUpdating = true;
 
@@ -319,10 +330,12 @@ class SessionPlayer {
                     return {
                         name: s.DeviceName,
                         deviceName: s.DeviceName,
+                        deviceId: s.DeviceId,
                         deviceType: s.DeviceType,
                         id: s.Id,
                         playerName: name,
                         appName: s.Client,
+                        nowPlayingName: getNowPlayingName(s.NowPlayingItem),
                         playableMediaTypes: s.PlayableMediaTypes,
                         isLocalPlayer: false,
                         supportedCommands: s.Capabilities.SupportedCommands,
@@ -637,7 +650,8 @@ class SessionPlayer {
     }
 
     getCurrentPlaylistItemId() {
-        return this.lastPlayerData.PlaylistItemId;
+        // lastPlayerData is undefined once the target session has gone away
+        return this.lastPlayerData?.PlaylistItemId;
     }
 
     setCurrentPlaylistItem(playlistItemId) {

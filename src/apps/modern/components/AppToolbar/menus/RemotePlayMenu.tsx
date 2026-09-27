@@ -37,7 +37,9 @@ const RemotePlayMenu: FC<RemotePlayMenuProps> = ({
     useEffect(() => {
         const fetchPlaybackTargets = async () => {
             setPlaybackTargets(
-                await playbackManager.getTargets()
+                // sessions that are playing something first
+                [ ...await playbackManager.getTargets() as PlayTarget[] ]
+                    .sort((a, b) => Number(!!b.nowPlayingName) - Number(!!a.nowPlayingName))
             );
         };
 
@@ -92,7 +94,7 @@ const RemotePlayMenu: FC<RemotePlayMenuProps> = ({
                     </ListItemIcon>
                     <ListItemText
                         primary={ target.appName ? `${target.name} - ${target.appName}` : target.name }
-                        secondary={ target.user?.Name }
+                        secondary={ target.nowPlayingName ? `▶ ${target.nowPlayingName}` : target.user?.Name }
                     />
                 </MenuItem>
             ))}

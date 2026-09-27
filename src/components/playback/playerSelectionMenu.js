@@ -8,12 +8,19 @@ import { appRouter } from '../router/appRouter';
 import globalize from '../../lib/globalize';
 import { appHost } from '../apphost';
 import { enable, isEnabled } from '../../scripts/autocast';
+import { forgetRemoteTarget } from '../../scripts/remoteTarget';
 import '../../elements/emby-checkbox/emby-checkbox';
 import '../../elements/emby-button/emby-button';
 import dialog from '../dialog/dialog';
 import dialogHelper from '../dialogHelper/dialogHelper';
 
 function getTargetSecondaryText(target) {
+    // Browsers of the same kind all report the same device name ("Chrome"),
+    // so say what each one is playing to tell them apart
+    if (target.nowPlayingName) {
+        return '▶ ' + target.nowPlayingName;
+    }
+
     if (target.user) {
         return target.user.Name;
     }
@@ -67,6 +74,8 @@ export function show(button) {
     loading.show();
 
     playbackManager.getTargets().then(function (targets) {
+        // Stable sort: sessions that are playing something first
+        targets = [...targets].sort((a, b) => Number(!!b.nowPlayingName) - Number(!!a.nowPlayingName));
         const menuItems = targets.map(function (t) {
             let name = t.name;
 
@@ -150,9 +159,11 @@ function disconnectFromPlayer(currentDeviceName) {
             switch (id) {
                 case 'yes':
                     playbackManager.getCurrentPlayer().endSession();
+                    forgetRemoteTarget();
                     playbackManager.setDefaultPlayerActive();
                     break;
                 case 'no':
+                    forgetRemoteTarget();
                     playbackManager.setDefaultPlayerActive();
                     break;
                 default:
@@ -162,6 +173,7 @@ function disconnectFromPlayer(currentDeviceName) {
             // dialog closed
         });
     } else {
+        forgetRemoteTarget();
         playbackManager.setDefaultPlayerActive();
     }
 }
