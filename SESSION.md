@@ -1,5 +1,8 @@
 # Sessions
 
+## 2026-10-02 — Now Playing page follows player switches again after Back (unattended optimize run)
+Hand-ported upstream `726de64eaa` so `remotecontrol.js` resubscribes to `playerchange` in `onShow()` (it was only subscribed in `init()` and dropped on `viewbeforehide`, leaving the phone pad on a stale player after browser Back), and made `updateNowPlayingInfo()` share one `getItem` call per state change instead of two; both are covered by a new `remotecontrol.test.js`, not tried in a real browser. Committed as `3616e19dc4` on local branch `opt/jellyfin-web-20261002-1148`, based on `subtitle-seeking` rather than upstream because the fork's file has diverged too far; not merged or deployed, and that branch carries its own `SESSION.md` entry for this run, so keep only one when merging.
+
 ## 2026-10-02 — Cheaper subtitle-cue availability check (unattended optimize run)
 The video OSD calls `updateSubtitleCueButtons()` on every time update (~0.7s), and `supportsSubtitleCueNavigation()` in `src/plugins/htmlVideoPlayer/plugin.js` answered by building the whole cue list (`map` + `filter` over every cue) just to test `length > 0`. It now stops at the first usable cue: 5143 checks (an hour of ticks) over 1000 cues went from ~170 ms to 0.8 ms in a new `plugin.test.js`. A small saving in absolute terms. Committed on local branch `opt/jellyfin-web-20261002-0312` (based on `subtitle-seeking`, since the code is fork-only); not merged or deployed. This branch's `plugin.test.js` will conflict with the file of the same name on `opt/jellyfin-web-20260929-1013` (keep both `describe` blocks). The four earlier `opt/` branches, upstream `726de64eaa` and the container's missing log `max-size` are still open.
 
