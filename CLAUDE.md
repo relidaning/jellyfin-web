@@ -76,11 +76,15 @@ remote if that device is playing. Only the cast menus' Disconnect
 in pad mode because it only reacts after the ~1s session round-trip.
 
 ## Deployed nginx caching (`/data/apps/mynextcloud/nginx-conf/default.conf`)
-The container on `:8097` serves every `.js`/`.css`/`.wasm` as
-`max-age=31536000, immutable`. That is only safe for hashed names: the main
-bundles get a `?<build hash>` from the `no-cache` `index.html`, but
-`themes/<id>/theme.css` and `libraries/*` (subtitle/PGS/PDF workers) are
-unhashed and loaded by fixed URL. If a deploy changes those (e.g. a rebase
-onto newer upstream) and a browser keeps the old copy, suspect this rule; the
-fix belongs in that nginx config (limit `immutable` to hashed names), not in
-fork-side version queries.
+Since mynextcloud commit `76c909b` (2026-10-07) the config marks only URLs
+that change with every build as `max-age=31536000, immutable` (a content hash
+in the name, or `*.bundle.js?<build hash>`); everything else
+(`themes/<id>/theme.css`, `libraries/*`, `index.html`, `config.json`) is
+`no-cache`, and `gzip.conf` also compresses `application/wasm`. The config
+files are bind-mounted, so the running container on `:8097` keeps the old
+copy until it is recreated: `docker compose up -d --force-recreate
+jellyfin-web` in `/data/apps/mynextcloud` (a recreate, not a plain restart,
+is also what applies compose changes such as the `logging` cap). If a browser
+shows a stale theme or subtitle worker, first `curl -sI` the asset on `:8097`
+— unhashed names must answer `Cache-Control: no-cache` — and fix it in that
+nginx config or by recreating, not with fork-side version queries.
