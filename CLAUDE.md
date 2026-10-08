@@ -74,3 +74,13 @@ remote if that device is playing. Only the cast menus' Disconnect
 (`forgetRemoteTarget()`) clears it. Remote volume uses absolute `SetVolume` in
 10% steps with an optimistic on-phone readout; the stock `.iconOsd` is hidden
 in pad mode because it only reacts after the ~1s session round-trip.
+
+## Deployed nginx caching (`/data/apps/mynextcloud/nginx-conf/default.conf`)
+The container on `:8097` serves every `.js`/`.css`/`.wasm` as
+`max-age=31536000, immutable`. That is only safe for hashed names: the main
+bundles get a `?<build hash>` from the `no-cache` `index.html`, but
+`themes/<id>/theme.css` and `libraries/*` (subtitle/PGS/PDF workers) are
+unhashed and loaded by fixed URL. If a deploy changes those (e.g. a rebase
+onto newer upstream) and a browser keeps the old copy, suspect this rule; the
+fix belongs in that nginx config (limit `immutable` to hashed names), not in
+fork-side version queries.
