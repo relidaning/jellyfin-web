@@ -1,5 +1,8 @@
 # Sessions
 
+## 2026-10-12 — Nothing committed; fourth optimize visit with the same two open items (unattended optimize run)
+Nothing new to fix inside the repo, so no worktree, branch or commit was created and the fork's code was not re-audited: all 8 commits of `opt/jellyfin-web-20261006-0344` are still missing from `subtitle-seeking` (the merge conflicts in `SESSION.md` only — keep every entry from both sides), and the `jellyfin-web` container (created 2026-09-27) still serves unhashed `themes/dark/theme.css` and `libraries/libpgs.worker.js` as `immutable` with an uncapped log. Re-cutting the combined branch so it fast-forwards was considered and left, since the next session note would break it again; merging and then `docker compose up -d --build jellyfin-web` in `/data/apps/mynextcloud` still clears both items at once.
+
 ## 2026-10-11 — Nothing committed; combined branch still unmerged and container still stale (unattended optimize run)
 Third visit in a row with nothing new to fix inside the repo, so no worktree, branch or commit was created and the fork's code was not re-audited (unchanged since the earlier visits): all 8 commits of `opt/jellyfin-web-20261006-0344` are still missing from `subtitle-seeking`, and the merge no longer fast-forwards — `git merge-tree` reports one conflict, in `SESSION.md` only (keep every entry from both sides). The `jellyfin-web` container (created 2026-09-27) still runs the old nginx config (unhashed `themes/dark/theme.css` and `libraries/libpgs.worker.js` answer `immutable`) with an uncapped log; merging and then `docker compose up -d --build jellyfin-web` in `/data/apps/mynextcloud` fixes both at once, and the run recommends pausing optimize visits until that is done.
 
