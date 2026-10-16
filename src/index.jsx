@@ -16,6 +16,7 @@ import { AppFeature } from 'constants/appFeature';
 import globalize from './lib/globalize';
 import { loadCoreDictionary } from 'lib/globalize/loader';
 import { initialize as initializeAutoCast } from 'scripts/autocast';
+import { initialize as initializeIdleSignOut } from 'scripts/idleSignOut';
 import { initialize as initializeRemoteTarget } from 'scripts/remoteTarget';
 import browser from './scripts/browser';
 import keyboardNavigation from './scripts/keyboardNavigation';
@@ -69,6 +70,9 @@ build: ${__JF_BUILD_VERSION__}`);
 
     // Initialize app host
     await appHost.init();
+
+    // Drop the saved login if the client was closed for too long
+    await initializeIdleSignOut();
 
     // Initialize the api client
     const serverUrl = await serverAddress();
