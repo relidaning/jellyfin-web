@@ -75,6 +75,14 @@ remote if that device is playing. Only the cast menus' Disconnect
 10% steps with an optimistic on-phone readout; the stock `.iconOsd` is hidden
 in pad mode because it only reacts after the ~1s session round-trip.
 
+## Idle sign-out (`src/scripts/idleSignOut.js`)
+The fork signs a client out once it has been closed/hidden for 30 minutes,
+tracked via `localStorage.jellyfin_lastActive` (refreshed once a minute while
+the tab runs). It only exists in the fork (`:8097`, reports version
+`12.0.0`); devices on the stock `:8096/web/` client (`10.11.8`) are never
+evicted, so "login wasn't evicted" reports should first check which client
+the device uses in the server's device list.
+
 ## Deployed nginx caching (`/data/apps/mynextcloud/nginx-conf/default.conf`)
 Since mynextcloud commit `76c909b` (2026-10-07) the config marks only URLs
 that change with every build as `max-age=31536000, immutable` (a content hash

@@ -1,5 +1,8 @@
 # Sessions
 
+## 2026-10-18 — Why the iPad login survived the idle sign-out (investigation only, no code change)
+The iPad was never signed out because it uses the stock `10.11.8` web client on `:8096`, not the fork on `:8097` (which reports `12.0.0` and has `idleSignOut.js`). This was confirmed from the server's device list, the served bundles and the logs, which show the fork's iPhone/Chrome logins being signed out as intended. The user was told to switch the iPad to `:8097` and, if they want, revoke the old "Safari iPad" device. Also flagged without changing anything: a Safari tab kept running in the background may keep resetting the 30-minute timer. A misdirected Nextcloud mock-exam request in the same session had nothing to do with this repo.
+
 ## 2026-10-13 — Nothing committed; sixth optimize visit, still nothing changed (unattended optimize run)
 Nothing had changed in the fork, the container or the served config since the previous visit, so no worktree, fetch, branch or commit was made and the code was not re-audited: all 8 commits of `opt/jellyfin-web-20261006-0344` are still missing from `subtitle-seeking` (conflict in `SESSION.md` only — keep every entry from both sides), and the `jellyfin-web` container (created 2026-09-27) still serves unhashed `themes/dark/theme.css` and `libraries/libpgs.worker.js` as `immutable` with an uncapped log, while both `config.json` copies correctly list only `http://192.168.255.6:8096`. The run again recommended pausing claude-maxer visits to this app until the branch is merged and the container rebuilt (`docker compose up -d --build jellyfin-web` in `/data/apps/mynextcloud`).
 
