@@ -475,3 +475,481 @@
         font-size: 4em;
     }
 }
+
+// Remote pad: phone-first layout used while controlling another session
+// (e.g. the laptop). Replaces the artwork, the stock button rows, the
+// navigation/message sections and the queue bar with large touch targets.
+// It is a single dark "glass over blurred artwork" look in every theme.
+.remotePadMode {
+    --remotepad-accent: #00a4dc;
+    --remotepad-accent-glow: rgba(0, 164, 220, 0.55);
+    --remotepad-ink: #f1f4f7;
+    --remotepad-glass: rgba(255, 255, 255, 0.07);
+    --remotepad-glass-edge: rgba(255, 255, 255, 0.13);
+    --remotepad-glass-pressed: rgba(255, 255, 255, 0.2);
+    --remotepad-top: 5em;
+
+    color: var(--remotepad-ink);
+
+    .nowPlayingPageImageContainer,
+    .nowPlayingButtonsContainer,
+    .remoteControlSection,
+    .playlistSection {
+        display: none !important;
+    }
+
+    &.remoteControlContent {
+        display: flex;
+        flex-direction: column;
+        max-width: 30em;
+        margin: 0 auto;
+        padding-left: max(1em, env(safe-area-inset-left)) !important;
+        padding-right: max(1em, env(safe-area-inset-right)) !important;
+        padding-bottom: max(1em, env(safe-area-inset-bottom));
+        box-sizing: border-box;
+        // exactly one screen below the header: the page never scrolls, the
+        // pad spreads its rows over whatever height is left
+        height: calc(100vh - var(--remotepad-top));
+        height: calc(100dvh - var(--remotepad-top));
+        overflow: hidden;
+    }
+
+    // everything above the fixed backdrop layer
+    > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .nowPlayingInfoContainer {
+        height: auto !important;
+        flex: none;
+    }
+
+    .nowPlayingInfoControls {
+        margin: 0;
+        width: 100%;
+    }
+
+    // one compact line: "Series · Episode" (or just the title for a movie)
+    .nowPlayingInfoContainerMedia {
+        display: flex;
+        justify-content: center;
+        align-items: baseline;
+        gap: 0.45em;
+        width: 100% !important;
+        margin: 0.4em 0 0;
+        min-width: 0;
+        font-size: 0.95em;
+        text-align: center !important;
+
+        > :empty,
+        .nowPlayingSeason {
+            display: none;
+        }
+
+        .nowPlayingSerie {
+            order: -1;
+            flex-shrink: 0;
+            max-width: 55%;
+            opacity: 0.75;
+        }
+
+        .nowPlayingSerie:not(:empty)::after {
+            content: " ·";
+        }
+
+        // plain text here: a stray (double-)tap mustn't navigate away
+        a {
+            pointer-events: none;
+        }
+
+        > * {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .nowPlayingPageTitle {
+        font-size: 1.05em;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        margin: 0;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+    }
+
+    .nowPlayingInfoControls .nowPlayingPageUserDataButtonsTitle {
+        display: none;
+    }
+
+    .positionTime,
+    .runtime {
+        font-variant-numeric: tabular-nums;
+        font-size: 0.85em;
+        opacity: 0.8;
+    }
+}
+
+// Top bar hidden by default in pad mode; double-tap empty space toggles it
+.remotePadHeaderHidden {
+    .MuiAppBar-root,
+    .skinHeader {
+        transform: translateY(-110%);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 200ms ease, opacity 200ms ease;
+    }
+
+    // OffsetAppBar's spacer div (same height as the bar) sits right after it
+    .MuiAppBar-root + div {
+        display: none;
+    }
+
+    .nowPlayingPage.nowPlayingPage {
+        padding-top: max(0.75em, env(safe-area-inset-top)) !important;
+    }
+
+    .remotePadMode {
+        --remotepad-top: 0.75em;
+    }
+}
+
+// Blurred artwork of what's playing, fixed behind the whole pad. It is a
+// sibling of the pad (not inside it) so it stays below the title too.
+.remotePadBackdrop {
+    position: fixed !important;
+    inset: 0;
+    z-index: 0 !important;
+    pointer-events: none;
+    background-color: #07090c;
+
+    &.hide {
+        display: none;
+    }
+
+    &::before,
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+    }
+
+    &::before {
+        background-image: var(--remotepad-art, none);
+        background-size: cover;
+        background-position: center;
+        filter: blur(38px) saturate(1.5) brightness(0.8);
+        transform: scale(1.25);
+        opacity: 0.65;
+    }
+
+    &::after {
+        background:
+            radial-gradient(ellipse at 50% 58%, rgba(0, 164, 220, 0.16), transparent 60%),
+            linear-gradient(180deg, rgba(7, 9, 12, 0.35) 0%, rgba(7, 9, 12, 0.75) 55%, rgba(7, 9, 12, 0.94) 100%);
+    }
+}
+
+.remotePad {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    flex: 1;
+    min-height: 0;
+    gap: 0.8em;
+    // bottom padding keeps the progress bar clear of floating buttons
+    padding: 0.5em 0 2.5em;
+    user-select: none;
+    -webkit-touch-callout: none;
+
+    &.hide {
+        display: none;
+    }
+}
+
+// Frosted pill buttons (tools above the ring, extras below it)
+.remotePadPill {
+    appearance: none;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4em;
+    min-height: 2.9em;
+    padding: 0 0.8em;
+    border-radius: 999px;
+    background: var(--remotepad-glass);
+    border: 1px solid var(--remotepad-glass-edge);
+    backdrop-filter: blur(14px);
+    transition: transform 80ms ease, background-color 120ms ease;
+
+    .material-icons {
+        font-size: 1.35em;
+    }
+
+    &:active {
+        transform: scale(0.95);
+        background: var(--remotepad-glass-pressed);
+    }
+
+    &:disabled {
+        opacity: 0.35;
+        pointer-events: none;
+    }
+
+    &.hide {
+        display: none;
+    }
+}
+
+.remotePadLabel {
+    font-size: 0.8em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.remotePadTools {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.45em;
+
+    // four across is tight on a phone: icon only, label as the tooltip
+    .remotePadLabel {
+        display: none;
+    }
+}
+
+.remotePadExtras {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6em;
+    width: min(100%, 18em);
+    margin: 0 auto;
+}
+
+// Ring remote: 8 wedge buttons around a split center (repeat | play), drawn
+// in SVG so the wedges are real hit areas. Icons are HTML overlays positioned
+// in % of the ring, and ignore pointer events so taps reach the wedge below.
+.remoteRing {
+    position: relative;
+    // shrink on short screens so the pad always fits without scrolling
+    width: min(100% - 1.2em, 21em, 46vh);
+    width: min(100% - 1.2em, 21em, 46dvh);
+    aspect-ratio: 1;
+    margin: 0.4em auto;
+    flex: none;
+}
+
+.remoteRingSvg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+// Playback position drawn as an arc around the ring
+.remoteRingTrack,
+.remoteRingArc {
+    fill: none;
+    stroke-width: 2.4;
+    pointer-events: none;
+}
+
+.remoteRingTrack {
+    stroke: rgba(255, 255, 255, 0.1);
+}
+
+.remoteRingArc {
+    stroke: var(--remotepad-accent);
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 3px var(--remotepad-accent-glow));
+    transition: stroke-dasharray 700ms linear;
+}
+
+.remoteRingButton {
+    --ring-fill: var(--remotepad-glass);
+    --ring-stroke: var(--remotepad-glass-edge);
+
+    cursor: pointer;
+    outline: none;
+
+    path {
+        fill: var(--ring-fill);
+        stroke: var(--ring-stroke);
+        stroke-width: 0.6;
+        transition: fill 120ms ease;
+    }
+
+    &.pressed path,
+    &:focus-visible path {
+        fill: var(--remotepad-accent);
+        filter: drop-shadow(0 0 6px var(--remotepad-accent-glow));
+    }
+
+    &.disabled {
+        opacity: 0.3;
+        pointer-events: none;
+    }
+}
+
+// Subtitle-line buttons: the main controls, so tinted with the accent
+.remoteRingCue {
+    --ring-fill: rgba(0, 164, 220, 0.22);
+    --ring-stroke: rgba(0, 164, 220, 0.6);
+}
+
+.remoteRingPlay {
+    --ring-fill: #fff;
+    --ring-stroke: #fff;
+
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.35));
+}
+
+.remoteRingIcon {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+
+    .material-icons {
+        font-size: 2em;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+    }
+
+    &.remoteRingIconCenter .material-icons {
+        font-size: 2.3em;
+    }
+
+    &.disabled {
+        opacity: 0.3;
+    }
+
+    &[data-icon-for="playPause"] {
+        color: #0b0e12;
+
+        .material-icons {
+            text-shadow: none;
+        }
+    }
+}
+
+.remoteRingBadge {
+    position: absolute;
+    right: -0.45em;
+    bottom: -0.2em;
+    font-size: 0.72em;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.02em;
+}
+
+// Instant volume readout over the top of the ring (the stock volume OSD would
+// only react once the remote reports back, ~1s later, so it's hidden here)
+.remotePadVolumeBubble {
+    position: absolute;
+    left: 50%;
+    top: -0.4em;
+    transform: translate(-50%, -100%) scale(0.92);
+    display: flex;
+    align-items: center;
+    gap: 0.55em;
+    padding: 0.45em 0.9em;
+    border-radius: 999px;
+    background: rgba(10, 14, 18, 0.82);
+    border: 1px solid var(--remotepad-glass-edge);
+    backdrop-filter: blur(14px);
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease, transform 150ms ease;
+    z-index: 2;
+
+    &.visible {
+        opacity: 1;
+        transform: translate(-50%, -100%) scale(1);
+    }
+}
+
+.remotePadVolumeIcon {
+    font-size: 1.3em;
+}
+
+.remotePadVolumeTrack {
+    width: 6em;
+    height: 0.3em;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    overflow: hidden;
+}
+
+.remotePadVolumeFill {
+    display: block;
+    height: 100%;
+    background: var(--remotepad-accent);
+    transition: width 120ms ease;
+}
+
+.remotePadVolumeValue {
+    min-width: 2.6em;
+    text-align: right;
+    font-size: 0.85em;
+}
+
+.remotePadLocked .iconOsd {
+    display: none !important;
+}
+
+.remotePadProgress {
+    .sliderContainer {
+        width: 100%;
+    }
+}
+
+.remotePadAwake {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4em;
+    font-size: 0.72em;
+    opacity: 0.5;
+    text-align: center;
+
+    .light_mode {
+        font-size: 1.3em;
+    }
+}
+
+// Short landscape phones: shrink so everything fits without scrolling
+@media all and (max-height: 32em) {
+    .remotePad {
+        gap: 0.6em;
+    }
+
+    .remoteRing {
+        width: min(100%, 14em);
+    }
+}
+
+// Pad mode locks the page: no scrolling, no rubber-band, no zoom
+.remotePadLocked {
+    &,
+    body {
+        overflow: hidden;
+        overscroll-behavior: none;
+        height: 100%;
+    }
+
+    body {
+        touch-action: pan-x pan-y;
+    }
+}

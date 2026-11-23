@@ -22,7 +22,9 @@ import { loadCoreDictionary } from '@/lib/globalize/loader';
 import getServerAddress from '@/lib/jellyfin-apiclient/utils/getServerAddress';
 import { initialize as initializeAutoCast } from '@/scripts/autocast';
 import browser from '@/scripts/browser';
+import { initialize as initializeIdleSignOut } from '@/scripts/idleSignOut';
 import keyboardNavigation from '@/scripts/keyboardNavigation';
+import { initialize as initializeRemoteTarget } from '@/scripts/remoteTarget';
 import { getPlugins } from '@/scripts/settings/webSettings';
 import taskButton from '@/scripts/taskbutton';
 import { pageClassOn, serverAddress } from '@/utils/dashboard';
@@ -80,6 +82,9 @@ build: ${__JF_BUILD_VERSION__}`);
     // Initialize app host
     await appHost.init();
 
+    // Drop the saved login if the client was closed for too long
+    await initializeIdleSignOut();
+
     // Find the correct server URL
     const lastServer = ServerConnections.getLastUsedServer();
     let serverUrl;
@@ -93,6 +98,8 @@ build: ${__JF_BUILD_VERSION__}`);
 
     // Initialize automatic (default) cast target
     initializeAutoCast();
+    // Keep a phone remote attached to the device it controls
+    initializeRemoteTarget();
 
     // Load the translation dictionary
     await loadCoreDictionary();

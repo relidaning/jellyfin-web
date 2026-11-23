@@ -66,7 +66,8 @@ class AppSettings {
         if (isInNetwork && mediaType === 'Audio') {
             return true;
         } else {
-            return toBoolean(this.get(key), true);
+            // Video defaults to a fixed quality (see maxStreamingBitrate's 1.5 Mbps fallback) instead of Auto
+            return toBoolean(this.get(key), mediaType !== 'Video');
         }
     }
 
@@ -83,6 +84,9 @@ class AppSettings {
         if (isInNetwork && mediaType === 'Audio') {
             // return a huge number so that it always direct plays
             return 150000000;
+        } else if (mediaType === 'Video' && this.get('enableautobitratebitrate-' + mediaType + '-' + isInNetwork) == null) {
+            // No quality picked by hand yet: ignore any bitrate left behind by the old Auto default
+            return 1500000;
         } else {
             return parseInt(this.get(key) || '0', 10) || 1500000;
         }

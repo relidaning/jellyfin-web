@@ -46,7 +46,9 @@
     }
   ],
   "menuLinks": [],
-  "servers": [],
+  "servers": [
+    "http://192.168.255.6:8096"
+  ],
   "plugins": [
     "playAccessValidation/plugin",
     "experimentalWarnings/plugin",

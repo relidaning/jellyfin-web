@@ -13,6 +13,7 @@ import React, { FC, useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { enable, isEnabled } from 'scripts/autocast';
+import { forgetRemoteTarget } from 'scripts/remoteTarget';
 import globalize from 'lib/globalize';
 
 interface RemotePlayActiveMenuProps extends MenuProps {
@@ -69,12 +70,14 @@ const RemotePlayActiveMenu: FC<RemotePlayActiveMenuProps> = ({
                 if (id === 'yes') {
                     playbackManager.getCurrentPlayer().endSession();
                 }
+                forgetRemoteTarget();
                 playbackManager.setDefaultPlayerActive();
             }).catch(() => {
             // Dialog closed
             });
         } else {
             onMenuClose();
+            forgetRemoteTarget();
             playbackManager.setDefaultPlayerActive();
         }
     }, [ onMenuClose, remotePlayerName ]);
