@@ -1,4 +1,5 @@
 import escapeHtml from 'escape-html';
+import Screenfull from 'screenfull';
 
 import { PlayerEvent } from 'apps/legacy/features/playback/constants/playerEvent';
 import { AppFeature } from 'constants/appFeature';
@@ -37,6 +38,15 @@ import { pluginManager } from 'components/pluginManager';
 
 function getOpenedDialog() {
     return document.querySelector('.dialogContainer .dialog.opened');
+}
+
+function getNativeFullscreenVideo(player) {
+    if (!browser.iOS || Screenfull.isEnabled || !player?.isLocalPlayer) {
+        return null;
+    }
+
+    const video = document.querySelector('video.htmlvideoplayer');
+    return typeof video?.webkitEnterFullscreen === 'function' ? video : null;
 }
 
 export default function (view) {
@@ -804,7 +814,8 @@ export default function (view) {
                 userSettings.skipForwardLength() * 1000000 / nowPlayingItem.RunTimeTicks);
         }
 
-        if (supportedCommands.indexOf('ToggleFullscreen') === -1 || player.isLocalPlayer && layoutManager.tv && playbackManager.isFullscreen(player)) {
+        const canToggleFullscreen = supportedCommands.includes('ToggleFullscreen') || getNativeFullscreenVideo(player);
+        if (!canToggleFullscreen || player.isLocalPlayer && layoutManager.tv && playbackManager.isFullscreen(player)) {
             view.querySelector('.btnFullscreen').classList.add('hide');
         } else {
             view.querySelector('.btnFullscreen').classList.remove('hide');
@@ -1862,7 +1873,12 @@ export default function (view) {
         releaseCurrentPlayer();
     });
     view.querySelector('.btnFullscreen').addEventListener('click', function () {
-        playbackManager.toggleFullscreen(currentPlayer);
+        const video = getNativeFullscreenVideo(currentPlayer);
+        if (video) {
+            video.webkitEnterFullscreen();
+        } else {
+            playbackManager.toggleFullscreen(currentPlayer);
+        }
     });
     view.querySelector('.btnPip').addEventListener('click', function () {
         playbackManager.togglePictureInPicture(currentPlayer);
