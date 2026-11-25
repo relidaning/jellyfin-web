@@ -614,6 +614,11 @@ export default function (view) {
             loadingTimeout = null;
         }
         loading.hide();
+        updatePictureInPictureButton(playbackManager.getSupportedCommands(this));
+    }
+
+    function updatePictureInPictureButton(supportedCommands) {
+        view.querySelector('.btnPip').classList.toggle('hide', !supportedCommands.includes('PictureInPicture'));
     }
 
     function bindToPlayer(player) {
@@ -821,11 +826,7 @@ export default function (view) {
             view.querySelector('.btnFullscreen').classList.remove('hide');
         }
 
-        if (supportedCommands.indexOf('PictureInPicture') === -1) {
-            view.querySelector('.btnPip').classList.add('hide');
-        } else {
-            view.querySelector('.btnPip').classList.remove('hide');
-        }
+        updatePictureInPictureButton(supportedCommands);
 
         if (supportedCommands.indexOf('AirPlay') === -1) {
             view.querySelector('.btnAirPlay').classList.add('hide');
@@ -1950,7 +1951,8 @@ export default function (view) {
     });
 
     dom.addEventListener(view, 'dblclick', (e) => {
-        if (e.target !== view) return;
+        // On iOS, fullscreen can open the native video player.
+        if (browser.iOS || e.target !== view) return;
         playbackManager.toggleFullscreen(currentPlayer);
     });
 

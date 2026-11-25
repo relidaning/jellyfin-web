@@ -19,16 +19,18 @@ import { AppFeature } from '@/constants/appFeature';
 import { EventType } from '@/constants/eventType';
 import globalize from '@/lib/globalize';
 import { loadCoreDictionary } from '@/lib/globalize/loader';
+import { ConnectionMode } from '@/lib/jellyfin-apiclient/connectionMode';
 import getServerAddress from '@/lib/jellyfin-apiclient/utils/getServerAddress';
 import { initialize as initializeAutoCast } from '@/scripts/autocast';
 import browser from '@/scripts/browser';
 import { initialize as initializeIdleSignOut } from '@/scripts/idleSignOut';
 import keyboardNavigation from '@/scripts/keyboardNavigation';
 import { initialize as initializeRemoteTarget } from '@/scripts/remoteTarget';
-import { getPlugins } from '@/scripts/settings/webSettings';
+import { getMultiServer, getPlugins, getServers } from '@/scripts/settings/webSettings';
 import taskButton from '@/scripts/taskbutton';
 import { pageClassOn, serverAddress } from '@/utils/dashboard';
 import Events from '@/utils/events';
+import { getFetchPromise } from '@/utils/fetch';
 import { updateApiClientSdk } from '@/lib/jellyfin-apiclient/utils/compat';
 import { unregisterServiceWorkers } from '@/utils/serviceWorker';
 import { initializeServerConnections } from '@/scripts/serverNotifications';
@@ -56,6 +58,32 @@ import '@/styles/librarybrowser.scss';
 
 let root: ReturnType<typeof createRoot> | undefined;
 
+async function updateSavedServerAddress() {
+    const server = ServerConnections.getLastUsedServer();
+    if (!server?.Id || await getMultiServer()) return;
+
+    const addresses = await getServers();
+    const address = addresses[0]?.replace(/\/$/, '');
+    if (addresses.length !== 1 || !address || address === getServerAddress(server)) return;
+
+    try {
+        const response = await getFetchPromise({
+            url: `${address}/System/Info/Public`,
+            type: 'GET',
+            timeout: 3000
+        });
+        if (!response.ok || (await response.json()).Id !== server.Id) return;
+    } catch (error) {
+        console.debug('Could not verify the configured Jellyfin server address', error);
+        return;
+    }
+
+    server.ManualAddress = address;
+    server.LastConnectionMode = ConnectionMode.Manual;
+    const provider = ServerConnections.credentialProvider();
+    provider.credentials(provider.credentials());
+}
+
 async function init() {
     // TODO: Remove this cleanup after users have migrated away from the service worker.
     void unregisterServiceWorkers();
@@ -81,6 +109,8 @@ build: ${__JF_BUILD_VERSION__}`);
 
     // Initialize app host
     await appHost.init();
+
+    await updateSavedServerAddress();
 
     // Drop the saved login if the client was closed for too long
     await initializeIdleSignOut();

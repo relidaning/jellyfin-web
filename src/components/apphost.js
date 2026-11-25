@@ -1,3 +1,5 @@
+import Screenfull from 'screenfull';
+
 import appSettings from '../scripts/settings/appSettings';
 import browser from '../scripts/browser';
 import Events from '../utils/events.ts';
@@ -176,6 +178,10 @@ function getDeviceName() {
 function supportsFullscreen() {
     if (browser.tv) {
         return false;
+    }
+
+    if (browser.iOS) {
+        return Screenfull.isEnabled;
     }
 
     const element = document.documentElement;

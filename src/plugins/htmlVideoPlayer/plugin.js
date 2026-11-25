@@ -658,8 +658,28 @@ export class HtmlVideoPlayer {
 
             elem.src = val;
             this.#currentSrc = val;
-            return playWithPromise(elem, this.onError);
+            return playWithPromise(elem, this.onError, browser.iOS ? () => {
+                if (elem === this.#mediaElement && options === this._currentPlayOptions && elem.paused) {
+                    this.showInlinePlayButton(elem);
+                }
+            } : undefined);
         }
+    }
+
+    showInlinePlayButton(elem) {
+        const dialog = this.#videoDialog;
+        loading.hide();
+        if (dialog.querySelector('.htmlVideoInlinePlay')) return;
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'htmlVideoInlinePlay raised button-submit';
+        button.textContent = globalize.translate('Play');
+        button.addEventListener('click', () => {
+            playWithPromise(elem, this.onError).catch(() => this.onError({ target: elem }));
+        });
+        dialog.appendChild(button);
+        elem.addEventListener('playing', () => button.remove(), { once: true });
     }
 
     setSubtitleStreamIndex(index) {
@@ -1872,7 +1892,7 @@ export class HtmlVideoPlayer {
                 const cssClass = 'htmlvideoplayer';
 
                 // Can't autoplay in these browsers so we need to use the full controls, at least until playback starts
-                if (!appHost.supports(AppFeature.HtmlVideoAutoplay)) {
+                if (!browser.iOS && !appHost.supports(AppFeature.HtmlVideoAutoplay)) {
                     html += '<video class="' + cssClass + '" preload="metadata" autoplay="autoplay" controls="controls" webkit-playsinline playsinline>';
                 } else if (browser.web0s) {
                     // in webOS, setting preload auto allows resuming videos
@@ -2003,15 +2023,6 @@ export class HtmlVideoPlayer {
         const list = [];
 
         const video = document.createElement('video');
-        if (
-            // Check non-standard Safari PiP support
-            typeof video.webkitSupportsPresentationMode === 'function' && video.webkitSupportsPresentationMode('picture-in-picture') && typeof video.webkitSetPresentationMode === 'function'
-            // Check standard PiP support
-            || document.pictureInPictureEnabled
-        ) {
-            list.push('PictureInPicture');
-        }
-
         if (browser.safari || browser.iOS || browser.iPad) {
             list.push('AirPlay');
         }
@@ -2028,6 +2039,12 @@ export class HtmlVideoPlayer {
     }
 
     supports(feature) {
+        if (feature === 'PictureInPicture') {
+            const video = this.#mediaElement;
+            return !!video && (this.canUseStandardPictureInPicture(video)
+                || this.canUseWebKitPictureInPicture(video));
+        }
+
         if (!this.#supportedFeatures) {
             this.#supportedFeatures = HtmlVideoPlayer.getSupportedFeatures();
         }
@@ -2078,35 +2095,40 @@ export class HtmlVideoPlayer {
         console.error(`Picture in picture error: ${err}`);
     }
 
+    canUseStandardPictureInPicture(video) {
+        return document.pictureInPictureEnabled && typeof video.requestPictureInPicture === 'function';
+    }
+
+    canUseWebKitPictureInPicture(video) {
+        return typeof video.webkitSetPresentationMode === 'function'
+            && typeof video.webkitSupportsPresentationMode === 'function'
+            && video.webkitSupportsPresentationMode('picture-in-picture');
+    }
+
     setPictureInPictureEnabled(isEnabled) {
         const video = this.#mediaElement;
+        if (!video) return;
 
-        if (document.pictureInPictureEnabled) {
-            if (video) {
-                if (isEnabled) {
-                    video.requestPictureInPicture().catch(HtmlVideoPlayer.onPictureInPictureError);
-                } else {
-                    document.exitPictureInPicture().catch(HtmlVideoPlayer.onPictureInPictureError);
-                }
+        if (!isEnabled && document.pictureInPictureElement === video) {
+            return document.exitPictureInPicture().catch(HtmlVideoPlayer.onPictureInPictureError);
+        }
+        if (isEnabled && this.canUseStandardPictureInPicture(video)) {
+            return video.requestPictureInPicture().catch(HtmlVideoPlayer.onPictureInPictureError);
+        }
+        if (this.canUseWebKitPictureInPicture(video)) {
+            try {
+                video.webkitSetPresentationMode(isEnabled ? 'picture-in-picture' : 'inline');
+            } catch (err) {
+                HtmlVideoPlayer.onPictureInPictureError(err);
             }
-        } else if (video?.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === 'function') {
-            video.webkitSetPresentationMode(isEnabled ? 'picture-in-picture' : 'inline');
         }
     }
 
     isPictureInPictureEnabled() {
-        if (document.pictureInPictureEnabled) {
-            return !!document.pictureInPictureElement;
-        } else if (window.Windows) {
-            return this.isPip || false;
-        } else {
-            const video = this.#mediaElement;
-            if (video) {
-                return video.webkitPresentationMode === 'picture-in-picture';
-            }
-        }
-
-        return false;
+        const video = this.#mediaElement;
+        return !!video && (document.pictureInPictureElement === video
+            || video.webkitPresentationMode === 'picture-in-picture'
+            || !!(window.Windows && this.isPip));
     }
 
     isAirPlayEnabled() {

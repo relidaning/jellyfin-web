@@ -11,6 +11,7 @@ import Screenfull from 'screenfull';
 
 import Events from '../../utils/events.ts';
 import datetime from '../../scripts/datetime';
+import browser from '../../scripts/browser';
 import appSettings from '../../scripts/settings/appSettings';
 import itemHelper from '../itemHelper';
 import { pluginManager } from '../pluginManager';
@@ -1488,8 +1489,10 @@ export class PlaybackManager {
 
             if (Screenfull.isEnabled) {
                 Screenfull.toggle();
+            } else if (browser.iOS) {
+                // Native video fullscreen replaces Jellyfin's controls on iOS.
+                return;
             } else if (document.webkitIsFullScreen && document.webkitCancelFullscreen) {
-                // iOS Safari
                 document.webkitCancelFullscreen();
             } else {
                 const elem = document.querySelector('video');

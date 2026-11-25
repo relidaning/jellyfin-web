@@ -179,15 +179,16 @@ function onSuccessfulPlay(elem, onErrorFn) {
     elem.addEventListener('error', onErrorFn);
 }
 
-export function playWithPromise(elem, onErrorFn) {
+export function playWithPromise(elem, onErrorFn, onAutoplayBlocked) {
     try {
         return elem.play()
             .catch((e) => {
                 const errorName = (e.name || '').toLowerCase();
-                // safari uses aborterror
+                // Safari can also reject with AbortError.
                 if (errorName === 'notallowederror'
                         || errorName === 'aborterror') {
-                    // swallow this error because the user can still click the play button on the video element
+                    // The user can retry playback with the play button.
+                    onAutoplayBlocked?.();
                     return Promise.resolve();
                 }
                 return Promise.reject(e);
